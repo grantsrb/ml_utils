@@ -127,7 +127,7 @@ def fill_hyper_q(hyps, hyp_ranges, keys, hyper_q, idx=0):
                                                              idx+1)
     return hyper_q
 
-def hyper_search(hyps, hyp_ranges):
+def hyper_search(hyps, hyp_ranges, train_fxn):
     """
     The top level function to create hyperparameter combinations and
     perform trainings.
@@ -143,6 +143,12 @@ def hyper_search(hyps, hyp_ranges):
         keys: str
         vals: lists of values for the hyperparameters specified by the
               keys
+    train_fxn: function
+        args:
+            hyps: dict
+            verbose: bool
+        a function that performs the desired training given the argued
+        hyperparams
     """
     starttime = time.time()
     # Make results file
@@ -181,7 +187,7 @@ def hyper_search(hyps, hyp_ranges):
                                              time.time()-starttime)
         hyps = hyper_q.get()
 
-        results = train(hyps, verbose=True)
+        results = train_fxn(hyps, verbose=True)
         with open(results_file,'a') as f:
             results = " -- ".join([str(k)+":"+str(results[k]) for\
                                      k in sorted(results.keys())])
