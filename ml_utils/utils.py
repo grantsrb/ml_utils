@@ -87,3 +87,42 @@ def get_max_key(d):
             max_k = k
     return max_k
 
+def update_shape(shape, kernel=3, padding=0, stride=1, op="conv"):
+    """
+    Calculates the new shape of the tensor following a convolution or
+    deconvolution
+
+    shape: list-like or int
+        the height/width of the activations
+    kernel: int or list-like
+        size of the kernel
+    padding: list-like or int
+    stride: list-like or int
+    op: str
+        'conv' or 'deconv'
+    """
+    if type(shape) == type(int()):
+        shape = np.asarray([shape])
+    else:
+        shape = np.asarray(shape)
+    if type(kernel) == type(int()):
+        kernel = np.asarray([kernel for i in range(len(shape))])
+    else:
+        kernel = np.asarray(kernel)
+    if type(padding) == type(int()):
+        padding = np.asarray([padding for i in range(len(shape))])
+    else:
+        padding = np.asarray(padding)
+    if type(stride) == type(int()):
+        stride = np.asarray([stride for i in range(len(shape))])
+    else:
+        stride = np.asarray(stride)
+
+    if op == "conv":
+        shape = (shape - kernel + 2*padding)/stride + 1
+    elif op == "deconv" or op == "conv_transpose":
+        shape = (shape - 1)*stride + kernel - 2*padding
+    if len(shape) == 1:
+        return int(shape[0])
+    return [int(s) for s in shape]
+

@@ -1,3 +1,4 @@
+import sys
 import os
 import numpy as np
 import torch
@@ -13,11 +14,110 @@ from collections import deque
 import psutil
 import json
 import ml_utils.save_io as io
+import ml_utils.utils
+import select
+import shutil
 
 if torch.cuda.is_available():
     DEVICE = torch.device("cuda:0")
 else:
     DEVICE = torch.device("cpu")
+
+def run_training(train_fxn):
+    """
+    This function extracts the hyperparams and hyperranges from the
+    command line arguments and asks the user if they would like to
+    proceed with the training and/or overwrite the previous save
+    folder.
+
+    train_fxn: function
+        this the training function that will carry out the training
+        args:
+            hyps: dict
+            verbose: bool
+    """
+    hyps = ml_utils.utils.load_json(sys.argv[1])
+    print()
+    print("Using hyperparams file:", sys.argv[1])
+    if len(sys.argv) < 3:
+        ranges = {"lr": [hyps['lr']]}
+    else:
+        ranges = ml_utils.utils.load_json(sys.argv[2])
+        print("Using hyperranges file:", sys.argv[2])
+    print()
+
+    hyps_str = ""
+    for k,v in hyps.items():
+        if k not in ranges:
+            hyps_str += "{}: {}\n".format(k,v)
+    print("Hyperparameters:")
+    print(hyps_str)
+    print("\nSearching over:")
+    print("\n".join(["{}: {}".format(k,v) for k,v in ranges.items()]))
+
+    main_path = hyps['exp_name']
+    if "save_root" in hyps:
+        hyps['save_root'] = os.path.expanduser(hyps['save_root'])
+        if not os.path.exists(hyps['save_root']):
+            os.mkdir(hyps['save_root'])
+        main_path = os.path.join(hyps['save_root'], main_path)
+    sleep_time = 8
+    if os.path.exists(main_path):
+        _, subds, _ = next(os.walk(main_path))
+        dirs = []
+        for d in subds:
+            splt = d.split("_")
+            if len(splt) >= 2 and splt[0] == hyps['exp_name']:
+                dirs.append(d)
+        dirs = sorted(dirs, key=lambda x: int(x.split("_")[1]))
+        if len(dirs) > 0:
+            s = "Overwrite last folder {}? (No/yes)".format(dirs[-1])
+            print(s)
+            i,_,_ = select.select([sys.stdin], [],[],sleep_time)
+            if i and "y" in sys.stdin.readline().strip().lower():
+                print("Are you sure?? This will delete the data (Y/n)")
+                i,_,_ = select.select([sys.stdin], [],[],sleep_time)
+                if i and "n" not in sys.stdin.readline().strip().lower():
+                    path = os.path.join(main_path, dirs[-1])
+                    shutil.rmtree(path, ignore_errors=True)
+        else:
+            s = "You have {} seconds to cancel experiment name {}:"
+            print(s.format(sleep_time, hyps['exp_name']))
+            i,_,_ = select.select([sys.stdin], [],[],sleep_time)
+    else:
+        s = "You have {} seconds to cancel experiment name {}:"
+        print(s.format(sleep_time, hyps['exp_name']))
+        i,_,_ = select.select([sys.stdin], [],[],sleep_time)
+    print()
+
+    keys = list(ranges.keys())
+    start_time = time.time()
+    ml_utils.training.hyper_search(hyps, ranges, train_fxn)
+    print("Total Execution Time:", time.time() - start_time)
+
+def get_resume_checkpt(hyps, verbose=True):
+    """
+    This function cleans up the code to resume from a particular
+    checkpoint or folder. 
+    
+    Be careful, this does change the hyps dict in place!!!!
+    """
+    resume_folder = ml_utils.utils.try_key(hyps,'resume_folder',None)
+    if resume_folder is not None and resume_folder != "":
+        checkpt = io.load_checkpoint(resume_folder)
+        if checkpt['epoch'] >= hyps['n_epochs'] and verbose:
+            print("Could not resume due to epoch count")
+            print("Performing fresh training")
+        else:
+            temp_hyps = checkpt['hyps']
+            for k,v in temp_hyps.items():
+                hyps[k] = v
+            hyps['resume_folder'] = resume_folder
+            hyps['seed'] += 1 # For fresh data
+            s = " restarted training from epoch "+str(checkpt['epoch'])
+            hyps['description'] = s
+            return checkpt
+    return None
 
 def get_exp_num(exp_folder, exp_name):
     """
@@ -25,7 +125,8 @@ def get_exp_num(exp_folder, exp_name):
 
     exp_folder: str
         path to the main experiment folder that contains the model
-        folders
+        folders (should not include the experiment name as the final
+        directory)
     exp_name: str
         the name of the experiment
     """
@@ -62,7 +163,9 @@ def get_save_folder(hyps):
 
 def record_session(hyps, model):
     """
-    Writes important parameters to file.
+    Writes important parameters to file. If 'resume_folder' is an entry
+    in the hyps dict, then the txt file is appended to instead of being
+    overwritten.
 
     hyps: dict
         dict of relevant hyperparameters
@@ -73,8 +176,9 @@ def record_session(hyps, model):
     if not os.path.exists(sf):
         os.mkdir(sf)
     h = "hyperparams"
-    with open(os.path.join(sf,h+".txt"),'w') as f:
-        f.write(str(model)+'\n')
+    mode = "a" if "resume_folder" in hyps else "w"
+    with open(os.path.join(sf,h+".txt"),mode) as f:
+        f.write("\n"+str(model)+'\n')
         for k in sorted(hyps.keys()):
             f.write(str(k) + ": " + str(hyps[k]) + "\n")
     temp_hyps = dict()
@@ -188,8 +292,27 @@ def hyper_search(hyps, hyp_ranges, train_fxn):
         hyps = hyper_q.get()
 
         results = train_fxn(hyps, verbose=True)
-        with open(results_file,'a') as f:
-            results = " -- ".join([str(k)+":"+str(results[k]) for\
-                                     k in sorted(results.keys())])
-            f.write("\n"+results+"\n")
+
+def make_hyper_range(low, high, range_len, method="log"):
+    """
+    Creates a list of length range_len that is a range between two
+    values. The method dictates the spacing between the values.
+
+    low: float
+        the lowest value in the range
+
+    """
+    if method.lower() == "random":
+        param_vals = np.random.random(low, high+1e-5, size=range_len)
+    elif method.lower() == "uniform":
+        step = (high-low)/(range_len-1)
+        param_vals = np.arange(low, high+1e-5, step=step)
+    else:
+        range_low = np.log(low)/np.log(10)
+        range_high = np.log(high)/np.log(10)
+        step = (range_high-range_low)/(range_len-1)
+        arange = np.arange(range_low, range_high+1e-5, step=step)
+        param_vals = 10**arange
+    param_vals = [float(param_val) for param_val in param_vals]
+    return param_vals
 
