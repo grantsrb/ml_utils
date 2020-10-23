@@ -3,11 +3,22 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import random
+import os
 
 MASK = "<MASK>"
 STOP = "<STOP>"
 START = "<START>"
 FILL = "<FILL>"
+
+def load_tokenizer(tokenizer, tok_folder):
+    """
+    tokenizer: huggingface tokenizers tokenizer
+    tok_folder: str
+        path to a folder with a vocab.json and merges.txt file
+    """
+    vocab  = os.path.expanduser(os.path.join(tok_folder,"vocab.json"))
+    merges = os.path.expanduser(os.path.join(tok_folder,"merges.txt"))
+    return tokenizer.from_file(vocab,merges)
 
 class ListWrapper:
     def __init__(self, arr, shape=None):
