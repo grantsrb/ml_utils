@@ -112,12 +112,14 @@ def get_resume_checkpt(hyps, verbose=True):
             temp_hyps = checkpt['hyps']
             for k,v in temp_hyps.items():
                 hyps[k] = v
-            hyps['resume_folder'] = resume_folder
             hyps['seed'] += 1 # For fresh data
-            s = " restarted training from epoch "+str(checkpt['epoch'])
-            hyps['description'] = s
-            return checkpt
-    return None
+            s = " Restarted training from epoch "+str(checkpt['epoch'])
+            hyps['description'] = ml_utils.utils.try_key(hyps,
+                                                         "description",
+                                                         "")
+            hyps['description'] += s
+            return checkpt, hyps
+    return None, hyps
 
 def get_exp_num(exp_folder, exp_name):
     """
