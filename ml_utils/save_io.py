@@ -77,26 +77,45 @@ def foldersort(x):
             pass
     assert False
 
-def get_model_folders(main_folder):
+def is_model_folder(path):
+    """
+    checks to see if the argued path is a model folder or otherwise.
+
+    path: str
+        path to check
+    """
+    check_folder = os.path.expanduser(path)
+    contents = os.listdir(check_folder)
+    for content in contents:
+        if ".pt" in content or "hyperparams.txt" == content:
+            return True
+    return False
+
+def get_model_folders(main_folder, incl_ext=False):
     """
     Returns a list of paths to the model folders contained within the
     argued main_folder
 
     main_folder - str
         path to main folder
+    incl_ext: bool
+        include extension flag. If true, the expanded paths are
+        returned. otherwise only the end folder (i.e.  <folder_name>
+        instead of main_folder/<folder_name>)
 
     Returns:
-        list of folders without full extension
+        list of folder names (see incl_ext for full path vs end point)
     """
     folders = []
     main_folder = os.path.expanduser(main_folder)
     for d, sub_ds, files in os.walk(main_folder):
         for sub_d in sub_ds:
-            contents = os.listdir(os.path.join(d,sub_d))
-            for content in contents:
-                if ".pt" in content or "hyperparams.txt" == content:
+            check_folder = os.path.join(d,sub_d)
+            if is_model_folder(check_folder):
+                if incl_ext:
+                    folders.append(check_folder)
+                else:
                     folders.append(sub_d)
-                    break
     return sorted(folders, key=foldersort)
 
 def load_checkpoint(path):
