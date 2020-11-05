@@ -101,7 +101,16 @@ def get_resume_checkpt(hyps, verbose=True):
     checkpoint or folder. 
     
     Be careful, this does change the hyps dict in place!!!!
+
+    hyps: dict
+        dictionary of hyperparameters
+        keys: str
+            "ignore_keys": list of str
+                an optional key to enumerate keys to be ignored when
+                loading the old hyperparameter set
+        vals: varies
     """
+    ignore_keys = ml_utils.utils.try_key(hyps,'ignore_keys',['n_epochs'])
     resume_folder = ml_utils.utils.try_key(hyps,'resume_folder',None)
     if resume_folder is not None and resume_folder != "":
         checkpt = io.load_checkpoint(resume_folder)
@@ -111,13 +120,15 @@ def get_resume_checkpt(hyps, verbose=True):
         else:
             temp_hyps = checkpt['hyps']
             for k,v in temp_hyps.items():
-                hyps[k] = v
+                if k not in ignore_keys:
+                    hyps[k] = v
             hyps['seed'] += 1 # For fresh data
             s = " Restarted training from epoch "+str(checkpt['epoch'])
             hyps['description'] = ml_utils.utils.try_key(hyps,
                                                          "description",
                                                          "")
             hyps['description'] += s
+            hyps['ignore_keys'] = ignore_keys
             return checkpt, hyps
     return None, hyps
 
