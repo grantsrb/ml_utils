@@ -101,6 +101,9 @@ def get_resume_checkpt(hyps, verbose=True):
     checkpoint or folder. 
     
     Be careful, this does change the hyps dict in place!!!!
+
+    "resume_folder" must be a key present in hyps for this function
+        to act.
     """
     resume_folder = ml_utils.utils.try_key(hyps,'resume_folder',None)
     if resume_folder is not None and resume_folder != "":
