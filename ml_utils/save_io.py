@@ -3,8 +3,11 @@ import pickle
 import ml_utils.utils as utils
 import os
 
+BEST_CHECKPT_NAME = "best_checkpt_0.pt.best"
+
 def save_checkpt(save_dict, save_name, epoch, ext=".pt",
-                                       del_prev_sd=True):
+                                       del_prev_sd=True,
+                                       best=False):
     """
     Saves a dictionary that contains a statedict
     
@@ -19,8 +22,11 @@ def save_checkpt(save_dict, save_name, epoch, ext=".pt",
     del_prev_sd: bool
         if true, the state_dict of the previous checkpoint will be
         deleted
+    best: bool
+        if true, saves this checkpoint as the best checkpoint under the
+        filename set by BEST_CHECKPT_NAME
     """
-    if del_prev_sd:
+    if del_prev_sd and epoch is not None:
         prev_path = "{}_{}{}".format(save_name,epoch-1,ext)
         prev_path = os.path.abspath(os.path.expanduser(prev_path))
         if os.path.exists(prev_path):
@@ -31,16 +37,39 @@ def save_checkpt(save_dict, save_name, epoch, ext=".pt",
                 if "state_dict" in key or "optim_dic" in key:
                     del data[key]
             torch.save(data, prev_path)
-        elif save_dict['epoch'] != 0:
+        elif epoch != 0:
             print("Failed to find previous checkpoint", prev_path)
+    if epoch is None: epoch = 0
     path = "{}_{}{}".format(save_name,epoch,ext)
     path = os.path.abspath(os.path.expanduser(path))
     torch.save(save_dict, path)
+    if best:
+        if "/" not in save_name:
+            folder = os.path.join("./")
+        else:
+            folder = save_name.split("/")[:-1]
+            folder = os.path.join(*folder)
+        save_best_checkpt(save_dict,folder)
+
+def save_best_checkpt(save_dict, folder):
+    """
+    Saves the checkpoint under the name set in BEST_CHECKPT_PATH to the
+    argued folder
+
+    save_dict: dict
+        a dictionary containing all the things you want to save
+    folder: str
+        the path to the folder to save the dict to.
+    """
+    path = os.path.join(folder,BEST_CHECKPT_NAME)
+    path = os.path.abspath(path)
+    torch.save(save_dict,path)
 
 def get_checkpoints(folder, checkpt_exts={'p', 'pt', 'pth'}):
     """
     Returns all .p, .pt, and .pth file names contained within the
-    folder.
+    folder. They're sorted by their epoch. BEST_CHECKPT_PATH is not
+    included in this list
 
     folder: str
         path to the folder of interest
@@ -50,7 +79,6 @@ def get_checkpoints(folder, checkpt_exts={'p', 'pt', 'pth'}):
         the full paths to the checkpoints contained in the folder
     """
     folder = os.path.expanduser(folder)
-    print(folder)
     assert os.path.isdir(folder)
     checkpts = []
     for f in os.listdir(folder):
@@ -120,18 +148,21 @@ def get_model_folders(main_folder, incl_ext=False):
 
 def load_checkpoint(path):
     """
-    Can load a specific model file both architecture and state_dict
-    if the file contains a model_state_dict key, or can just load the
-    architecture.
+    Loads the save_dict into python. If the path is to a model_folder,
+    the loaded checkpoint is the BEST checkpt if available, otherwise
+    the checkpt of the last epoch
 
     path: str
-        path to checkpoint file
+        path to checkpoint file or model_folder
     """
     path = os.path.expanduser(path)
     if os.path.isdir(path):
-        checkpts = get_checkpoints(path)
-        hyps = get_hyps(path)
-        path = checkpts[-1]
+        best_path = os.path.join(path,BEST_CHECKPT_NAME)
+        if os.path.exists(best_path):
+            path = best_path 
+        else:
+            checkpts = get_checkpoints(path)
+            path = checkpts[-1]
     data = torch.load(path, map_location=torch.device("cpu"))
     return data
 
@@ -145,7 +176,10 @@ def load_model(path, models, load_sd=True, verbose=True):
         either .pt,.p, or .pth checkpoint file; or path to save folder
         that contains multiple checkpoints
     models: dict
-        this is easiest if you simply pass `globals()` as this parameter
+        A dict of the potential model classes. This function is
+        easiest if you import each of the model classes in the calling
+        script and simply pass `globals()` as the argument for this
+        parameter
 
         keys: str
             the class names of the potential models
@@ -157,10 +191,6 @@ def load_model(path, models, load_sd=True, verbose=True):
     """
     path = os.path.expanduser(path)
     hyps = None
-    if os.path.isdir(path):
-        checkpts = get_checkpoints(path)
-        hyps = get_hyps(path)
-        path = checkpts[-1]
     data = load_checkpoint(path)
     if 'hyps' in data:
         kwargs = data['hyps']
