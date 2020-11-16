@@ -105,6 +105,8 @@ def get_resume_checkpt(hyps, verbose=True):
     hyps: dict
         dictionary of hyperparameters
         keys: str
+            "resume_folder": str
+                must be a key present in hyps for this function to act.
             "ignore_keys": list of str
                 an optional key to enumerate keys to be ignored when
                 loading the old hyperparameter set
