@@ -17,6 +17,8 @@ import ml_utils.save_io as io
 import ml_utils.utils
 import select
 import shutil
+import os
+import torch.multiprocessing as mp
 
 if torch.cuda.is_available():
     DEVICE = torch.device("cuda:0")
@@ -112,7 +114,8 @@ def get_resume_checkpt(hyps, verbose=True):
                 loading the old hyperparameter set
         vals: varies
     """
-    ignore_keys = ml_utils.utils.try_key(hyps,'ignore_keys',['n_epochs'])
+    ignore_keys = ['n_epochs','rank']
+    ignore_keys = ml_utils.utils.try_key(hyps,'ignore_keys',ignore_keys)
     resume_folder = ml_utils.utils.try_key(hyps,'resume_folder',None)
     if resume_folder is not None and resume_folder != "":
         checkpt = io.load_checkpoint(resume_folder)
@@ -279,6 +282,12 @@ def hyper_search(hyps, hyp_ranges, train_fxn):
         main_path = os.path.join(hyps['save_root'], main_path)
     if not os.path.exists(main_path):
         os.mkdir(main_path)
+
+    if hyps['multi_gpu']:
+        hyps["n_gpus"] = torch.cuda.device_count()
+        hyps['world_size'] = hyps['n_nodes']*hyps['n_gpus']
+        os.environ['MASTER_ADDR'] = '127.0.0.1'     
+        os.environ['MASTER_PORT'] = '8021'
     hyps['main_path'] = main_path
     results_file = os.path.join(main_path, "results.txt")
     with open(results_file,'a') as f:
@@ -306,7 +315,12 @@ def hyper_search(hyps, hyp_ranges, train_fxn):
                                              time.time()-starttime)
         hyps = hyper_q.get()
 
-        results = train_fxn(hyps, verbose=True)
+        verbose = True
+        if hyps['multi_gpu']:
+            mp.spawn(train_fxn, nprocs=hyps['n_gpus'],
+                                args=(hyps,verbose))
+        else:
+            train_fxn(0, hyps, verbose=True)
 
 def make_hyper_range(low, high, range_len, method="log"):
     """
