@@ -114,7 +114,8 @@ def get_resume_checkpt(hyps, verbose=True):
                 loading the old hyperparameter set
         vals: varies
     """
-    ignore_keys = ml_utils.utils.try_key(hyps,'ignore_keys',['n_epochs'])
+    ignore_keys = ['n_epochs','rank']
+    ignore_keys = ml_utils.utils.try_key(hyps,'ignore_keys',ignore_keys)
     resume_folder = ml_utils.utils.try_key(hyps,'resume_folder',None)
     if resume_folder is not None and resume_folder != "":
         checkpt = io.load_checkpoint(resume_folder)
@@ -319,7 +320,7 @@ def hyper_search(hyps, hyp_ranges, train_fxn):
             mp.spawn(train_fxn, nprocs=hyps['n_gpus'],
                                 args=(hyps,verbose))
         else:
-            train_fxn(hyps, verbose=True)
+            train_fxn(0, hyps, verbose=True)
 
 def make_hyper_range(low, high, range_len, method="log"):
     """
