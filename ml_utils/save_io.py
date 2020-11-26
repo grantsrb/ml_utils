@@ -162,6 +162,7 @@ def load_checkpoint(path):
             path = best_path 
         else:
             checkpts = get_checkpoints(path)
+            if len(checkpts)==0: return None
             path = checkpts[-1]
     data = torch.load(path, map_location=torch.device("cpu"))
     return data
