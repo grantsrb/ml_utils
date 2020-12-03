@@ -146,7 +146,7 @@ def get_model_folders(main_folder, incl_ext=False):
                     folders.append(sub_d)
     return sorted(folders, key=foldersort)
 
-def load_checkpoint(path):
+def load_checkpoint(path,use_best=False):
     """
     Loads the save_dict into python. If the path is to a model_folder,
     the loaded checkpoint is the BEST checkpt if available, otherwise
@@ -154,11 +154,13 @@ def load_checkpoint(path):
 
     path: str
         path to checkpoint file or model_folder
+    use_best: bool
+        if true, will load the best checkpt based on validation metrics
     """
     path = os.path.expanduser(path)
     if os.path.isdir(path):
         best_path = os.path.join(path,BEST_CHECKPT_NAME)
-        if os.path.exists(best_path):
+        if use_best and os.path.exists(best_path):
             path = best_path 
         else:
             checkpts = get_checkpoints(path)
@@ -167,7 +169,8 @@ def load_checkpoint(path):
     data = torch.load(path, map_location=torch.device("cpu"))
     return data
 
-def load_model(path, models, load_sd=True, verbose=True):
+def load_model(path, models, load_sd=True, use_best=False,
+                                           verbose=True):
     """
     Loads the model architecture and state dict from a .pt or .pth
     file. Or from a training save folder. Defaults to the last check
@@ -189,10 +192,12 @@ def load_model(path, models, load_sd=True, verbose=True):
     load_sd: bool
         if true, the saved state dict is loaded. Otherwise only the
         model architecture is loaded with a random initialization.
+    use_best: bool
+        if true, will load the best model based on validation metrics
     """
     path = os.path.expanduser(path)
     hyps = None
-    data = load_checkpoint(path)
+    data = load_checkpoint(path,use_best=use_best)
     if 'hyps' in data:
         kwargs = data['hyps']
     elif 'model_hyps' in data:

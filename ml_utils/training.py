@@ -231,22 +231,35 @@ def fill_hyper_q(hyps, hyp_ranges, keys, hyper_q, idx=0):
     Returns:
         hyper_q: Queue of dicts `hyps`
     """
-    # Base call, runs the training and saves the result
+    # Base call, saves the hyperparameter combination
     if idx >= len(keys):
         # Load q
         hyps['search_keys'] = ""
         for k in keys:
-            hyps['search_keys'] += "_" + str(k)+str(hyps[k])
+            if isinstance(hyp_ranges[k],dict):
+                for rk in hyp_ranges[k].keys():
+                    hyps['search_keys'] += "_" + str(rk)+str(hyps[rk])
+            else:
+                hyps['search_keys'] += "_" + str(k)+str(hyps[k])
         hyper_q.put({k:v for k,v in hyps.items()})
 
     # Non-base call. Sets a hyperparameter to a new search value and
     # passes down the dict.
     else:
         key = keys[idx]
-        for param in hyp_ranges[key]:
-            hyps[key] = param
-            hyper_q = fill_hyper_q(hyps, hyp_ranges, keys, hyper_q,
-                                                             idx+1)
+        # Allows us to specify combinations of hyperparameters
+        if isinstance(hyp_ranges[key],dict):
+            rkeys = list(hyp_ranges[key].keys())
+            for i in range(len(hyp_ranges[key][rkeys[0]])):
+                for rkey in rkeys:
+                    hyps[rkey] = hyp_ranges[key][rkey][i]
+                hyper_q = fill_hyper_q(hyps, hyp_ranges, keys, hyper_q,
+                                                               idx+1)
+        else:
+            for param in hyp_ranges[key]:
+                hyps[key] = param
+                hyper_q = fill_hyper_q(hyps, hyp_ranges, keys, hyper_q,
+                                                               idx+1)
     return hyper_q
 
 def hyper_search(hyps, hyp_ranges, train_fxn):
@@ -283,6 +296,7 @@ def hyper_search(hyps, hyp_ranges, train_fxn):
     if not os.path.exists(main_path):
         os.mkdir(main_path)
 
+    hyps['multi_gpu'] = ml_utils.utils.try_key(hyps,'multi_gpu',False)
     if hyps['multi_gpu']:
         hyps["n_gpus"] = torch.cuda.device_count()
         hyps['world_size'] = hyps['n_nodes']*hyps['n_gpus']
@@ -297,8 +311,14 @@ def hyper_search(hyps, hyp_ranges, train_fxn):
                 f.write(str(k) + ": " + str(hyps[k]) + '\n')
         f.write("\nHyperranges:\n")
         for k in hyp_ranges.keys():
-            rs = ",".join([str(v) for v in hyp_ranges[k]])
-            s = str(k) + ": [" + rs +']\n'
+            if isinstance(hyp_ranges[k],dict):
+                s = str(k)+":\n"
+                for rk in hyp_ranges[k].keys():
+                    rs = ",".join([str(v) for v in hyp_ranges[k][rk]])
+                    s += "  "+str(rk) + ": [" + rs +']\n'
+            else:
+                rs = ",".join([str(v) for v in hyp_ranges[k]])
+                s = str(k) + ": [" + rs +']\n'
             f.write(s)
         f.write('\n')
 
@@ -320,7 +340,7 @@ def hyper_search(hyps, hyp_ranges, train_fxn):
             mp.spawn(train_fxn, nprocs=hyps['n_gpus'],
                                 args=(hyps,verbose))
         else:
-            train_fxn(0, hyps, verbose=True)
+            train_fxn(0, hyps=hyps, verbose=verbose)
 
 def make_hyper_range(low, high, range_len, method="log"):
     """
