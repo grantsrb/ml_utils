@@ -11,7 +11,12 @@ setup(name='ml_utils',
       install_requires= ["numpy",
                          "torch",
                          "tqdm",
-                         "psutil"],
+                         "psutil",
+                         "opencv-python",
+                         "select",
+                         "shutil",
+                         "json"
+                         ],
       py_modules=['ml_utils'],
       long_description='''
             A collection of useful functions for ml projects
