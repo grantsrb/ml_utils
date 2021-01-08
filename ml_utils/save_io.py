@@ -49,6 +49,7 @@ def save_checkpt(save_dict, save_name, epoch, ext=".pt",
         else:
             folder = save_name.split("/")[:-1]
             folder = os.path.join(*folder)
+            if save_name[0] == "/": folder = "/" + folder
         save_best_checkpt(save_dict,folder)
 
 def save_best_checkpt(save_dict, folder):
