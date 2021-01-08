@@ -19,6 +19,7 @@ import select
 import shutil
 import os
 import torch.multiprocessing as mp
+from datetime import datetime
 
 if torch.cuda.is_available():
     DEVICE = torch.device("cuda:0")
@@ -196,6 +197,8 @@ def record_session(hyps, model):
     h = "hyperparams"
     mode = "a" if "resume_folder" in hyps else "w"
     with open(os.path.join(sf,h+".txt"),mode) as f:
+        dt_string = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        f.write(dt_string)
         f.write("\n"+str(model)+'\n')
         for k in sorted(hyps.keys()):
             f.write(str(k) + ": " + str(hyps[k]) + "\n")
