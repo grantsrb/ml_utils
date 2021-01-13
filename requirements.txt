@@ -4,5 +4,3 @@ tqdm
 psutil
 scikit-build
 opencv-python
-shutil
-json
