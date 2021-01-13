@@ -13,9 +13,6 @@ setup(name='ml_utils',
                          "tqdm",
                          "psutil",
                          "opencv-python",
-                         "select",
-                         "shutil",
-                         "json"
                          ],
       py_modules=['ml_utils'],
       long_description='''
