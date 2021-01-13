@@ -3,6 +3,5 @@ torch
 tqdm
 psutil
 opencv-python
-select
 shutil
 json
