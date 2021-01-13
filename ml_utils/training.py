@@ -21,83 +21,6 @@ import os
 import torch.multiprocessing as mp
 from datetime import datetime
 
-if torch.cuda.is_available():
-    DEVICE = torch.device("cuda:0")
-else:
-    DEVICE = torch.device("cpu")
-
-def run_training(train_fxn):
-    """
-    This function extracts the hyperparams and hyperranges from the
-    command line arguments and asks the user if they would like to
-    proceed with the training and/or overwrite the previous save
-    folder.
-
-    train_fxn: function
-        this the training function that will carry out the training
-        args:
-            hyps: dict
-            verbose: bool
-    """
-    hyps = ml_utils.utils.load_json(sys.argv[1])
-    print()
-    print("Using hyperparams file:", sys.argv[1])
-    if len(sys.argv) < 3:
-        ranges = {"lr": [hyps['lr']]}
-    else:
-        ranges = ml_utils.utils.load_json(sys.argv[2])
-        print("Using hyperranges file:", sys.argv[2])
-    print()
-
-    hyps_str = ""
-    for k,v in hyps.items():
-        if k not in ranges:
-            hyps_str += "{}: {}\n".format(k,v)
-    print("Hyperparameters:")
-    print(hyps_str)
-    print("\nSearching over:")
-    print("\n".join(["{}: {}".format(k,v) for k,v in ranges.items()]))
-
-    main_path = hyps['exp_name']
-    if "save_root" in hyps:
-        hyps['save_root'] = os.path.expanduser(hyps['save_root'])
-        if not os.path.exists(hyps['save_root']):
-            os.mkdir(hyps['save_root'])
-        main_path = os.path.join(hyps['save_root'], main_path)
-    sleep_time = 8
-    if os.path.exists(main_path):
-        _, subds, _ = next(os.walk(main_path))
-        dirs = []
-        for d in subds:
-            splt = d.split("_")
-            if len(splt) >= 2 and splt[0] == hyps['exp_name']:
-                dirs.append(d)
-        dirs = sorted(dirs, key=lambda x: int(x.split("_")[1]))
-        if len(dirs) > 0:
-            s = "Overwrite last folder {}? (No/yes)".format(dirs[-1])
-            print(s)
-            i,_,_ = select.select([sys.stdin], [],[],sleep_time)
-            if i and "y" in sys.stdin.readline().strip().lower():
-                print("Are you sure?? This will delete the data (Y/n)")
-                i,_,_ = select.select([sys.stdin], [],[],sleep_time)
-                if i and "n" not in sys.stdin.readline().strip().lower():
-                    path = os.path.join(main_path, dirs[-1])
-                    shutil.rmtree(path, ignore_errors=True)
-        else:
-            s = "You have {} seconds to cancel experiment name {}:"
-            print(s.format(sleep_time, hyps['exp_name']))
-            i,_,_ = select.select([sys.stdin], [],[],sleep_time)
-    else:
-        s = "You have {} seconds to cancel experiment name {}:"
-        print(s.format(sleep_time, hyps['exp_name']))
-        i,_,_ = select.select([sys.stdin], [],[],sleep_time)
-    print()
-
-    keys = list(ranges.keys())
-    start_time = time.time()
-    ml_utils.training.hyper_search(hyps, ranges, train_fxn)
-    print("Total Execution Time:", time.time() - start_time)
-
 def get_resume_checkpt(hyps, verbose=True):
     """
     This function cleans up the code to resume from a particular
@@ -265,6 +188,29 @@ def fill_hyper_q(hyps, hyp_ranges, keys, hyper_q, idx=0):
                                                                idx+1)
     return hyper_q
 
+def make_hyper_range(low, high, range_len, method="log"):
+    """
+    Creates a list of length range_len that is a range between two
+    values. The method dictates the spacing between the values.
+
+    low: float
+        the lowest value in the range
+
+    """
+    if method.lower() == "random":
+        param_vals = np.random.random(low, high+1e-5, size=range_len)
+    elif method.lower() == "uniform":
+        step = (high-low)/(range_len-1)
+        param_vals = np.arange(low, high+1e-5, step=step)
+    else:
+        range_low = np.log(low)/np.log(10)
+        range_high = np.log(high)/np.log(10)
+        step = (range_high-range_low)/(range_len-1)
+        arange = np.arange(range_low, range_high+1e-5, step=step)
+        param_vals = 10**arange
+    param_vals = [float(param_val) for param_val in param_vals]
+    return param_vals
+
 def hyper_search(hyps, hyp_ranges, train_fxn):
     """
     The top level function to create hyperparameter combinations and
@@ -345,26 +291,75 @@ def hyper_search(hyps, hyp_ranges, train_fxn):
         else:
             train_fxn(0, hyps=hyps, verbose=verbose)
 
-def make_hyper_range(low, high, range_len, method="log"):
+def run_training(train_fxn):
     """
-    Creates a list of length range_len that is a range between two
-    values. The method dictates the spacing between the values.
+    This function extracts the hyperparams and hyperranges from the
+    command line arguments and asks the user if they would like to
+    proceed with the training and/or overwrite the previous save
+    folder.
 
-    low: float
-        the lowest value in the range
-
+    train_fxn: function
+        this the training function that will carry out the training
+        args:
+            hyps: dict
+            verbose: bool
     """
-    if method.lower() == "random":
-        param_vals = np.random.random(low, high+1e-5, size=range_len)
-    elif method.lower() == "uniform":
-        step = (high-low)/(range_len-1)
-        param_vals = np.arange(low, high+1e-5, step=step)
+    hyps = ml_utils.utils.load_json(sys.argv[1])
+    print()
+    print("Using hyperparams file:", sys.argv[1])
+    if len(sys.argv) < 3:
+        ranges = {"lr": [hyps['lr']]}
     else:
-        range_low = np.log(low)/np.log(10)
-        range_high = np.log(high)/np.log(10)
-        step = (range_high-range_low)/(range_len-1)
-        arange = np.arange(range_low, range_high+1e-5, step=step)
-        param_vals = 10**arange
-    param_vals = [float(param_val) for param_val in param_vals]
-    return param_vals
+        ranges = ml_utils.utils.load_json(sys.argv[2])
+        print("Using hyperranges file:", sys.argv[2])
+    print()
+
+    hyps_str = ""
+    for k,v in hyps.items():
+        if k not in ranges:
+            hyps_str += "{}: {}\n".format(k,v)
+    print("Hyperparameters:")
+    print(hyps_str)
+    print("\nSearching over:")
+    print("\n".join(["{}: {}".format(k,v) for k,v in ranges.items()]))
+
+    main_path = hyps['exp_name']
+    if "save_root" in hyps:
+        hyps['save_root'] = os.path.expanduser(hyps['save_root'])
+        if not os.path.exists(hyps['save_root']):
+            os.mkdir(hyps['save_root'])
+        main_path = os.path.join(hyps['save_root'], main_path)
+    sleep_time = 8
+    if os.path.exists(main_path):
+        _, subds, _ = next(os.walk(main_path))
+        dirs = []
+        for d in subds:
+            splt = d.split("_")
+            if len(splt) >= 2 and splt[0] == hyps['exp_name']:
+                dirs.append(d)
+        dirs = sorted(dirs, key=lambda x: int(x.split("_")[1]))
+        if len(dirs) > 0:
+            s = "Overwrite last folder {}? (No/yes)".format(dirs[-1])
+            print(s)
+            i,_,_ = select.select([sys.stdin], [],[],sleep_time)
+            if i and "y" in sys.stdin.readline().strip().lower():
+                print("Are you sure?? This will delete the data (Y/n)")
+                i,_,_ = select.select([sys.stdin], [],[],sleep_time)
+                if i and "n" not in sys.stdin.readline().strip().lower():
+                    path = os.path.join(main_path, dirs[-1])
+                    shutil.rmtree(path, ignore_errors=True)
+        else:
+            s = "You have {} seconds to cancel experiment name {}:"
+            print(s.format(sleep_time, hyps['exp_name']))
+            i,_,_ = select.select([sys.stdin], [],[],sleep_time)
+    else:
+        s = "You have {} seconds to cancel experiment name {}:"
+        print(s.format(sleep_time, hyps['exp_name']))
+        i,_,_ = select.select([sys.stdin], [],[],sleep_time)
+    print()
+
+    keys = list(ranges.keys())
+    start_time = time.time()
+    hyper_search(hyps, ranges, train_fxn)
+    print("Total Execution Time:", time.time() - start_time)
 
