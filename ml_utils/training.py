@@ -72,16 +72,28 @@ def get_exp_num(exp_folder, exp_name):
     exp_name: str
         the name of the experiment
     """
+    name_splt = exp_name.split("_")
+    namedex = 1
+    if len(name_splt) > 1:
+        namedex = len(name_splt)
     exp_folder = os.path.expanduser(exp_folder)
     _, dirs, _ = next(os.walk(exp_folder))
     exp_nums = set()
     for d in dirs:
         splt = d.split("_")
-        if len(splt) >= 2 and splt[0] == exp_name:
-            try:
-                exp_nums.add(int(splt[1]))
-            except:
-                pass
+        if len(splt) >= 2:
+            num = None
+            for i in range(len(splt)):
+                try:
+                    num = int(splt[i])
+                    break
+                except:
+                    pass
+            if namedex > 1 and i > 1:
+                name = "_".join(splt[:namedex])
+            else: name = splt[0]
+            if name == exp_name and num is not None:
+                exp_nums.add(num)
     for i in range(len(exp_nums)):
         if i not in exp_nums:
             return i
@@ -331,13 +343,7 @@ def run_training(train_fxn):
         main_path = os.path.join(hyps['save_root'], main_path)
     sleep_time = 8
     if os.path.exists(main_path):
-        _, subds, _ = next(os.walk(main_path))
-        dirs = []
-        for d in subds:
-            splt = d.split("_")
-            if len(splt) >= 2 and splt[0] == hyps['exp_name']:
-                dirs.append(d)
-        dirs = sorted(dirs, key=lambda x: int(x.split("_")[1]))
+        dirs = io.get_model_folders(main_path)
         if len(dirs) > 0:
             s = "Overwrite last folder {}? (No/yes)".format(dirs[-1])
             print(s)

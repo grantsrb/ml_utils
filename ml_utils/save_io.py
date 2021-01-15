@@ -106,14 +106,24 @@ def foldersort(x):
             pass
     assert False
 
-def is_model_folder(path):
+def is_model_folder(path, exp_name=None):
     """
     checks to see if the argued path is a model folder or otherwise.
 
     path: str
         path to check
+    exp_name: str or None
     """
     check_folder = os.path.expanduser(path)
+    if exp_name is not None:
+        exp_splt = exp_name.split("_")
+        if check_folder[-1]=="/": check_folder = check_folder[:-1]
+        folder_splt = check_folder.split("/")
+        folder_splt = folder_splt[-1].split("_")
+        match = True
+        for i in range(len(exp_splt)):
+            if exp_splt[i] != folder_splt[i]: match = False
+        if match: return True
     contents = os.listdir(check_folder)
     for content in contents:
         if ".pt" in content or "hyperparams.txt" == content:
@@ -137,10 +147,12 @@ def get_model_folders(main_folder, incl_ext=False):
     """
     folders = []
     main_folder = os.path.expanduser(main_folder)
+    exp_name = main_folder.split("/")
+    exp_name = exp_name[-1] if len(exp_name[-1])>0 else exp_name[-2]
     for d, sub_ds, files in os.walk(main_folder):
         for sub_d in sub_ds:
             check_folder = os.path.join(d,sub_d)
-            if is_model_folder(check_folder):
+            if is_model_folder(check_folder,exp_name=exp_name):
                 if incl_ext:
                     folders.append(check_folder)
                 else:
