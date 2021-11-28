@@ -10,7 +10,7 @@ def save_checkpt(save_dict, save_name, epoch, ext=".pt",
                                        best=False):
     """
     Saves a dictionary that contains a statedict
-    
+
     save_dict: dict
         a dictionary containing all the things you want to save
     save_name: str
@@ -23,8 +23,8 @@ def save_checkpt(save_dict, save_name, epoch, ext=".pt",
         if true, the state_dict of the previous checkpoint will be
         deleted
     best: bool
-        if true, saves this checkpoint as the best checkpoint under the
-        filename set by BEST_CHECKPT_NAME
+        if true, additionally saves this checkpoint as the best
+        checkpoint under the filename set by BEST_CHECKPT_NAME
     """
     if del_prev_sd and epoch is not None:
         prev_path = "{}_{}{}".format(save_name,epoch-1,ext)
@@ -50,7 +50,7 @@ def save_checkpt(save_dict, save_name, epoch, ext=".pt",
             folder = save_name.split("/")[:-1]
             folder = os.path.join(*folder)
             if save_name[0] == "/": folder = "/" + folder
-        save_best_checkpt(save_dict,folder)
+        save_best_checkpt(save_dict, folder)
 
 def save_best_checkpt(save_dict, folder):
     """
@@ -192,7 +192,7 @@ def load_model(path, models, load_sd=True, use_best=False,
     path: str
         either .pt,.p, or .pth checkpoint file; or path to save folder
         that contains multiple checkpoints
-    models: dict
+    models: dict (just pass `globals()` as the arg)
         A dict of the potential model classes. This function is
         easiest if you import each of the model classes in the calling
         script and simply pass `globals()` as the argument for this
