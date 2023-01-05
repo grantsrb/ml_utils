@@ -1,5 +1,5 @@
 # Machine Learning Utils
-This repo contains functions and classes that are used in almost all of my deep learning projects.
+This repo contains functions and classes that can be used in deep learning projects.
 
 ## Setup
 After cloning the repo, install all necessary packages locally:
