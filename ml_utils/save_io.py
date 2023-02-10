@@ -26,10 +26,18 @@ def save_checkpt(save_dict, save_name, epoch, ext=".pt",
         if true, additionally saves this checkpoint as the best
         checkpoint under the filename set by BEST_CHECKPT_NAME
     """
+    if "/" not in save_name:
+        folder = os.path.join("./")
+    else:
+        folder = save_name.split("/")[:-1]
+        folder = os.path.join(*folder)
+        if save_name[0] == "/": folder = "/" + folder
     if del_prev_sd and epoch is not None:
-        prev_path = "{}_{}{}".format(save_name,epoch-1,ext)
-        prev_path = os.path.abspath(os.path.expanduser(prev_path))
-        if os.path.exists(prev_path):
+        prev_paths = get_checkpoints(folder)
+        if len(prev_paths) > 0:
+            prev_path = prev_paths[-1]
+            ##prev_path = os.path.abspath(os.path.expanduser(prev_path))
+            ##if os.path.exists(prev_path):
             device = torch.device("cpu")
             data = torch.load(prev_path, map_location=device)
             keys = list(data.keys())
@@ -37,19 +45,11 @@ def save_checkpt(save_dict, save_name, epoch, ext=".pt",
                 if "state_dict" in key or "optim_dic" in key:
                     del data[key]
             torch.save(data, prev_path)
-        elif epoch != 0:
-            print("Failed to find previous checkpoint", prev_path)
     if epoch is None: epoch = 0
     path = "{}_{}{}".format(save_name,epoch,ext)
     path = os.path.abspath(os.path.expanduser(path))
     torch.save(save_dict, path)
     if best:
-        if "/" not in save_name:
-            folder = os.path.join("./")
-        else:
-            folder = save_name.split("/")[:-1]
-            folder = os.path.join(*folder)
-            if save_name[0] == "/": folder = "/" + folder
         save_best_checkpt(save_dict, folder)
 
 def save_best_checkpt(save_dict, folder):
@@ -183,6 +183,7 @@ def load_checkpoint(path,use_best=False):
     return data
 
 def load_model(path, models, load_sd=True, use_best=False,
+                                           hyps=None,
                                            verbose=True):
     """
     Loads the model architecture and state dict from a .pt or .pth
@@ -207,19 +208,23 @@ def load_model(path, models, load_sd=True, use_best=False,
         model architecture is loaded with a random initialization.
     use_best: bool
         if true, will load the best model based on validation metrics
+    hyps: dict (optional)
+        if you would like to argue your own hyps, you can do that here
     """
     path = os.path.expanduser(path)
-    hyps = None
     data = load_checkpoint(path,use_best=use_best)
-    if 'hyps' in data:
+    if hyps is not None:
+        kwargs = {**hyps}
+    elif 'hyps' in data:
         kwargs = data['hyps']
     elif 'model_hyps' in data:
         kwargs = data['model_hyps']
-    elif hyps is not None:
-        kwargs = hyps
     else:
         assert False, "Cannot find architecture arguments"
-    model = models[kwargs['model_class']](**kwargs)
+    try:
+        model = models[kwargs['model_class']](**kwargs)
+    except KeyError:
+        model = models[kwargs['model']](**kwargs)
     if "state_dict" in data and load_sd:
         try:
             model.load_state_dict(data['state_dict'])
