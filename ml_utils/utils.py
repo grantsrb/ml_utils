@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import json
 import os
 import cv2
 
@@ -14,19 +13,6 @@ def try_key(d, key, val):
     if key in d:
         return d[key]
     return val
-
-def load_json(file_name):
-    """
-    Loads a json file as a python dict
-
-    file_name: str
-        the path of the json file
-    """
-    file_name = os.path.expanduser(file_name)
-    with open(file_name,'r') as f:
-        s = f.read()
-        j = json.loads(s)
-    return j
 
 def resize2Square(img, size):
     """
