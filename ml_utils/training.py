@@ -370,6 +370,7 @@ def run_training(train_fxn):
         if not os.path.exists(hyps['save_root']):
             os.mkdir(hyps['save_root'])
         exp_folder = os.path.join(hyps['save_root'], exp_folder)
+    print("Main Exp Folder:", exp_folder)
     sleep_time = 8
     if os.path.exists(exp_folder):
         dirs = io.get_model_folders(exp_folder)

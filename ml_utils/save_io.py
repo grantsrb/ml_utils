@@ -1,7 +1,5 @@
 import torch
 import pickle
-import cogmtc.models
-import ml_utils.utils as utils
 import os
 import json
 
@@ -62,7 +60,8 @@ def delete_sds(checkpt_path):
             the full path to the checkpoint
     """
     if not os.path.exists(checkpt_path): return
-    checkpt = load_checkpoint(checkpt_path)
+    device = torch.device("cpu")
+    checkpt = load_checkpoint(checkpt_path, map_location=device)
     keys = list(checkpt.keys())
     for key in keys:
         if "state_dict" in key or "optim_dict" in key:
@@ -117,8 +116,8 @@ def foldersort(x):
     A sorting key function to order folder names with the format:
     <path_to_folder>/<exp_name>_<exp_num>_<ending_folder_name>/
 
-    Assumes that the experiment name will never contain an integer
-    surrounded by underscores (i.e. this is an invalid exp_name foo_1)
+    Assumes that the experiment number will always be the rightmost
+    occurance ofan integer surrounded by underscores (i.e. _1_)
 
     x: str
     """
@@ -165,13 +164,15 @@ def is_model_folder(path, exp_name=None):
     if exp_name is not None:
         # Remove ending slash if there is one
         if check_folder[-1]=="/": check_folder = check_folder[:-1]
-
-        exp_splt = exp_name.split("_")
-        folder_splt = check_folder.split("/")
-        folder_splt = folder_splt[-1].split("_")
+        folder_splt = check_folder.split("/")[-1]
+        # Need to split on underscores and check for entirety of
+        # exp_name because exp_name is only the first part of any
+        # model folder
+        name_splt = exp_name.split("_")
+        folder_splt = folder_splt.split("_")
         match = True
-        for i in range(len(exp_splt)):
-            if i<len(folder_splt) and exp_splt[i] != folder_splt[i]:
+        for i in range(len(name_splt)):
+            if i >= len(folder_splt) or name_splt[i] != folder_splt[i]:
                 match = False
                 break
         if match: return True
@@ -199,15 +200,18 @@ def get_model_folders(exp_folder, incl_full_path=False):
     """
     folders = []
     exp_folder = os.path.expanduser(exp_folder)
+    if exp_folder[-1]=="/":
+        exp_name = exp_folder[:-1].split("/")[-1]
+    else:
+        exp_name = exp_folder.split("/")[-1]
     if ".pt" in exp_folder[-4:]:
         # if model file, return the corresponding folder
         folders = [ "/".join(exp_folder.split("/")[:-1]) ]
     else:
-        print("searching folders")
         for d, sub_ds, files in os.walk(exp_folder):
             for sub_d in sub_ds:
                 check_folder = os.path.join(d,sub_d)
-                if is_model_folder(check_folder):
+                if is_model_folder(check_folder, exp_name=exp_name):
                     if incl_full_path:
                         folders.append(check_folder)
                     else:
@@ -236,7 +240,6 @@ def load_checkpoint(path, use_best=False):
     path = os.path.expanduser(path)
     hyps = None
     if os.path.isdir(path):
-        hyps = utils.load_json(os.path.join(path, "hyperparams.json"))
         best_path = os.path.join(path,BEST_CHECKPT_NAME)
         if use_best and os.path.exists(best_path):
             path = best_path 
@@ -246,7 +249,8 @@ def load_checkpoint(path, use_best=False):
             path = checkpts[-1]
     data = torch.load(path, map_location=torch.device("cpu"))
     data["loaded_path"] = path
-    if "hyps" not in data: data["hyps"] = hyps
+    if "hyps" not in data: 
+        data["hyps"] = get_hyps(path)
     if "epoch" not in data:
         # Untested!!
         ext = path.split(".")[-1]
@@ -328,7 +332,7 @@ def get_hyps(folder):
     if not os.path.isdir(folder):
         folder = get_model_folders(folder)[0]
     hyps_json = os.path.join(folder, "hyperparams.json")
-    hyps = utils.load_json(hyps_json)
+    hyps = load_json(hyps_json)
     return hyps
 
 def load_hyps(folder):
