@@ -30,26 +30,19 @@ def save_checkpt(save_dict, save_folder, save_name, epoch, ext=".pt",
         if true, additionally saves this checkpoint as the best
         checkpoint under the filename set by BEST_CHECKPT_NAME
     """
-    if "/" not in save_name:
-        folder = os.path.join("./")
-    else:
-        folder = save_name.split("/")[:-1]
-        folder = os.path.join(*folder)
-        if save_name[0] == "/": folder = "/" + folder
     if del_prev_sd and epoch is not None:
-        prev_paths = get_checkpoints(folder)
+        prev_paths = get_checkpoints(save_folder)
         if len(prev_paths) > 0:
             prev_path = prev_paths[-1]
             delete_sds(prev_path)
         elif epoch != 0:
-            print("Failed to find previous checkpoint", prev_path)
+            print("Failed to find previous checkpoint")
     if epoch is None: epoch = 0
     path = "{}_{}{}".format(save_name,epoch,ext)
     path = os.path.join(save_folder, path)
     path = os.path.abspath(os.path.expanduser(path))
     torch.save(save_dict, path)
-    if best:
-        save_best_checkpt(save_dict, folder)
+    if best: save_best_checkpt(save_dict, save_folder)
 
 def delete_sds(checkpt_path):
     """
@@ -60,8 +53,7 @@ def delete_sds(checkpt_path):
             the full path to the checkpoint
     """
     if not os.path.exists(checkpt_path): return
-    device = torch.device("cpu")
-    checkpt = load_checkpoint(checkpt_path, map_location=device)
+    checkpt = load_checkpoint(checkpt_path)
     keys = list(checkpt.keys())
     for key in keys:
         if "state_dict" in key or "optim_dict" in key:

@@ -19,14 +19,13 @@ This repo contains functions and classes that can be used in deep learning proje
     i.e. `/home/user/project_saves/my_exp_name/my_exp_name_0_lr0.001`
 
 ## Setup
-After cloning the repo, install all necessary packages locally:
+Clone this repo as a submodule in your project. Then install all
+necessary packages locally:
 ```sh
 python3 -m pip install --user -r requirements.txt
 ```
-Next you will to install this pip package. Run the following:
-```sh
-python3 -m pip install --user -e .
-```
+
+You can install this as a pip package using my repo `train_tools`
 
 
 
