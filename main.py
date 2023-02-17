@@ -5,7 +5,7 @@ to perform trainings.
 """
 
 import torch
-from ml_utils.training import run_training
+from .training import run_training
 import torch.multiprocessing as mp
 
 torch.autograd.set_detect_anomaly(True)

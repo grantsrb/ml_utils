@@ -39,8 +39,8 @@ values will be on the second session, etc.
 
 import sys
 import os
-from cogmtc.utils.utils import load_json, save_json, try_key
-from cogmtc.utils.training import fill_hyper_q
+from ml_utils.utils import load_json, save_json, try_key
+from ml_utils.training import fill_hyper_q
 from datetime import datetime
 from collections import deque
 import math
