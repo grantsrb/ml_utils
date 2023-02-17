@@ -25,8 +25,6 @@ necessary packages locally:
 python3 -m pip install --user -r requirements.txt
 ```
 
-You can install this as a pip package using my repo `train_tools`
-
 
 
 
