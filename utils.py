@@ -112,3 +112,26 @@ def update_shape(shape, kernel=3, padding=0, stride=1, op="conv"):
         return int(shape[0])
     return [int(s) for s in shape]
 
+def top_k_acc(preds, labels, k=5, as_tensor=False):
+    """
+    Returns the top_n accuracy for the argued predictions and labels
+
+    Args:
+        preds: torch float tensor (B, L)
+            the logits or probabilities
+        labels: torch long tensor (B,)
+            the correct labels
+        k: int
+            the k to use for top k
+        as_tensor: bool
+            if true, returns result as a tensor
+    Returns:
+        top_n: float or tensor
+
+    """
+    ps = preds.reshape(-1,preds.shape[-1])
+    args = torch.topk(ps,k,largest=True,sorted=False,dim=-1).indices
+    acc = (args==labels.reshape(-1)[:,None]).float().sum(-1).mean()
+    if as_tensor:
+        return acc
+    return acc.item()
