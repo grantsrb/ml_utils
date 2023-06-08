@@ -127,7 +127,9 @@ def foldersort(x):
 
 def prep_search_keys(s):
     """
-    Removes unwanted characters from the search keys string.
+    Removes unwanted characters from the search keys string. This
+    allows you to easily append a string representing the search
+    keys to the model folder name.
     """
     return s.replace(
             " ", ""
@@ -143,7 +145,7 @@ def prep_search_keys(s):
             "/", ""
         )
 
-def is_model_folder(path, exp_name=None):
+def is_model_folder(path, exp_name=None, incl_empty=True):
     """
     checks to see if the argued path is a model folder or otherwise.
     i.e. does the folder contain checkpt files and a hyperparams.json?
@@ -151,9 +153,14 @@ def is_model_folder(path, exp_name=None):
     path: str
         path to check
     exp_name: str or None
+        optionally include exp_name to determine if a folder is a model
+        folder based on the name instead of the contents.
+    incl_empty: bool
+        if true, will include folders without checkpoints as possible
+        model folders.
     """
     check_folder = os.path.expanduser(path)
-    if exp_name is not None:
+    if incl_empty and exp_name is not None:
         # Remove ending slash if there is one
         if check_folder[-1]=="/": check_folder = check_folder[:-1]
         folder_splt = check_folder.split("/")[-1]
@@ -167,14 +174,41 @@ def is_model_folder(path, exp_name=None):
             if i >= len(folder_splt) or name_splt[i] != folder_splt[i]:
                 match = False
                 break
-        if match: return True
-    contents = os.listdir(check_folder)
-    for content in contents:
-        if ".pt" in content or "hyperparams" in content:
+        if match:
             return True
-    return False
+    contents = os.listdir(check_folder)
+    is_empty = True
+    has_hyps = False
+    for content in contents:
+        if ".pt" in content: is_empty = False
+        if "hyperparams" in content: has_hyps = True
+    if incl_empty: return has_hyps or not is_empty
+    return not is_empty
 
-def get_model_folders(exp_folder, incl_full_path=False):
+def is_incomplete_folder(path):
+    """
+    checks to see if the argued path is an empty model folder. 
+    i.e. does the folder contain a hyperparams.json without checkpt
+    files? Generally it is okay to delete empty model folders.
+
+    WARNING: ONLY RETURNS TRUE IF THE FOLDER CONTAINS A HYPERPARAMETERS
+    JSON WITHOUT ANY CHECKPOINTS. WILL RETURN FALSE FOR COMPLETELY
+    EMPTY FOLDERS!!!!
+
+    path: str
+        path to check
+    exp_name: str or None
+    """
+    check_folder = os.path.expanduser(path)
+    contents = os.listdir(check_folder)
+    is_empty = True
+    has_hyps = False
+    for content in contents:
+        if ".pt" in content: is_empty = False
+        if "hyperparams" in content: has_hyps = True
+    return has_hyps and is_empty
+
+def get_model_folders(exp_folder, incl_full_path=False, incl_empty=True):
     """
     Returns a list of paths to the model folders contained within the
     argued exp_folder
@@ -185,6 +219,9 @@ def get_model_folders(exp_folder, incl_full_path=False):
         include extension flag. If true, the expanded paths are
         returned. otherwise only the end folder (i.e.  <folder_name>
         instead of exp_folder/<folder_name>)
+    incl_empty: bool
+        if true, will include folders without checkpoints as possible
+        model folders.
 
     Returns:
         list of folder names (see incl_full_path for full path vs end
@@ -203,12 +240,16 @@ def get_model_folders(exp_folder, incl_full_path=False):
         for d, sub_ds, files in os.walk(exp_folder):
             for sub_d in sub_ds:
                 check_folder = os.path.join(d,sub_d)
-                if is_model_folder(check_folder, exp_name=exp_name):
+                is_mf = is_model_folder(
+                    check_folder,exp_name=exp_name,incl_empty=incl_empty
+                )
+                if is_mf:
                     if incl_full_path:
                         folders.append(check_folder)
                     else:
                         folders.append(sub_d)
-        if is_model_folder(exp_folder): folders.append(exp_folder)
+        if is_model_folder(exp_folder,incl_empty=incl_empty):
+            folders.append(exp_folder)
     folders = list(set(folders))
     if incl_full_path: folders = [os.path.expanduser(f) for f in folders]
     return sorted(folders, key=foldersort)
@@ -324,8 +365,10 @@ def get_hyps(folder):
     if not os.path.isdir(folder):
         folder = get_model_folders(folder)[0]
     hyps_json = os.path.join(folder, "hyperparams.json")
-    hyps = load_json(hyps_json)
-    return hyps
+    if os.path.exists(hyps_json):
+        hyps = load_json(hyps_json)
+        return hyps
+    return None
 
 def load_hyps(folder):
     """
