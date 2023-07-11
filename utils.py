@@ -1,7 +1,10 @@
 import numpy as np
 import torch
 import os
-import cv2
+try:
+    import cv2
+except:
+    pass
 
 def try_key(d, key, val):
     """
