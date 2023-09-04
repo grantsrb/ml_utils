@@ -344,10 +344,16 @@ def load_model(path, models, load_sd=True, use_best=False,
         except:
             print("failed to load state dict, attempting fix")
             sd = data["state_dict"]
-            keys = {*sd.keys(), *model.state_dict().keys()}
+            m_sd = model.state_dict()
+            keys = {*sd.keys(), *m_sd.keys()}
             for k in keys:
-                if k not in sd: sd[k] = getattr(model, k)
-                if k not in model: setattr(model, k, sd[k])
+                if k not in sd:
+                    print("Error for", k)
+                    sd[k] = getattr(model, k)
+                if k not in m_sd:
+                    print("Error for", k)
+                    setattr(model, k, sd[k])
+            model.load_state_dict(sd)
             print("succeeded!")
     else:
         print("state dict not loaded!")
